@@ -17,40 +17,6 @@ from keras.models import load_model
 import keras.backend as K
 import os
 
-def Global_attention_block(inputs):
-    shape=K.int_shape(inputs)
-    x=AveragePooling2D(pool_size=(shape[1],shape[2])) (inputs)
-    x=Conv2D(shape[3],1, padding='same') (x)
-    x=Activation('relu') (x)
-    x=Conv2D(shape[3],1, padding='same') (x)
-    x=Activation('sigmoid') (x)
-    C_A=Multiply()([x,inputs])
-    
-    x=Lambda(lambda x: K.mean(x,axis=-1,keepdims=True))  (C_A)
-    x=Activation('sigmoid') (x)
-    S_A=Multiply()([x,C_A])
-    return S_A
-    
-    
-def Category_attention_block(inputs,classes,k):
-    shape=K.int_shape(inputs)
-    F=Conv2D(k*classes,1, padding='same') (inputs)
-    F=BatchNormalization() (F)
-    F1=Activation('relu') (F)
-    
-    F2=F1
-    x=GlobalMaxPool2D()(F2)
-    
-    x=Reshape((classes,k)) (x)
-    S=Lambda(lambda x: K.mean(x,axis=-1,keepdims=False))  (x)
-    
-    x=Reshape((shape[1],shape[2],classes,k)) (F1)
-    x=Lambda(lambda x: K.mean(x,axis=-1,keepdims=False))  (x)
-    x=Multiply()([S,x])
-    M=Lambda(lambda x: K.mean(x,axis=-1,keepdims=True))  (x)
-    
-    semantic=Multiply()([inputs,M])
-    return semantic
 
 def smooth_curve(points, factor=0.9):
     smoothed_points = []
@@ -115,9 +81,7 @@ def get_base_model(model_name,image_size):
     
 def train_model(model,dataset,image_size,batch_size,save_name,lr1,lr2,Epochs1,Epochs2):
     
-    dataParam={'messidor': [957,243,2,'./data/messidor/train','./data/messidor/test'],
-               'kaggle': [30000,5126,5,'./data/kaggle/train','./data/kaggle/valid'],
-               'DDR':   [9851,2503,5,'./data/DDR/train','./data/DDR/valid']} #6119
+    dataParam={ 'kaggle': [30000,5126,5,'./data/kaggle/train','./data/kaggle/valid']} #6119
     
     train_num,valid_num,classes,train_dir,test_dir = dataParam[dataset]
     
@@ -175,20 +139,13 @@ base_model=get_base_model('mobilenet1.0',image_size)
 base_in=base_model.input
 base_out=base_model.output
 
-x=Global_attention_block(base_out)
-base_out=Category_attention_block(x,classes,k)
-
 x=GlobalAveragePooling2D()(base_out)
 out=Dense(classes,activation='softmax')(x)
 
-if gpu_num>1:
-    model=Model(base_model.input,out)
-    #model.summary()
-    parallel_model = multi_gpu_model(model, gpus=gpu_num)
-    parallel_model.summary()
-else:
-    parallel_model=Model(base_model.input,out)
-    parallel_model.summary()
+
+model=Model(base_model.input,out)
+  
+model.summary()
     
-history=train_model(parallel_model,'bird',image_size,batch_size,'densenet121',lr1,lr2,1,70)
+history=train_model(model,'bird',image_size,batch_size,'densenet121',lr1,lr2,1,70)
 plotmodel(history,'densenet121')
